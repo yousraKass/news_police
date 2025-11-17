@@ -60,7 +60,7 @@ def get_vectorstore_size(persist_dir="./chroma_db"):
 
 #    script_dir = Path(__file__).parent
 #    data_path = script_dir.parent / "data" / "7days_transcripts_2025-11-01.csv"
-#    index_new_documents(str(data_path), append=False)
+#    index_new_documents(str(data_path), append=True)
 
 
 #    total_docs = get_vectorstore_size("./RAG/chroma_db")
