@@ -21,6 +21,3 @@ def process_daily_news():
         
     except Exception as e:
         print(f"[{datetime.now()}] ERROR: Failed to process daily news - {str(e)}")
-
-if __name__ == "__main__":
-    process_daily_news()
