@@ -6,6 +6,9 @@ from langchain_community.vectorstores import Chroma
 import os
 from pathlib import Path
 import shutil
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def index_new_documents(csv_path, persist_dir="./RAG/chroma_db", append=True):
     df = pd.read_csv(csv_path)
