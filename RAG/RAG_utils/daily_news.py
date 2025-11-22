@@ -3,7 +3,10 @@ import os
 from datetime import datetime
 
 def process_daily_news():
-    data_path = "./RAG/daily_data/daily_data.csv"
+    # Path relative to the RAG folder
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # RAG_utils folder
+    project_root = os.path.abspath(os.path.join(script_dir, ".."))  # go up to RAG
+    data_path = os.path.join(project_root, "daily_data", "daily_data.csv")
     
     if not os.path.exists(data_path):
         print(f"[{datetime.now()}] ERROR: No daily data file found at {data_path}")
