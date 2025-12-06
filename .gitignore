@@ -205,3 +205,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local RAG caches and databases
+RAG/models_cache/
+expirement/
+chroma_db/
+
+node_modules/
