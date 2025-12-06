@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const cors = require('cors');
 const dataRouter = require('./routers/data.js');
@@ -15,9 +16,7 @@ app.get("/", (req, res) => {
     message: "News Police DB API is running!",
     status: "healthy",
     timestamp: new Date().toISOString(),
-    routes: [
-      "/data"
-    ]
+    routes: ["/data"]
   });
 });
 
