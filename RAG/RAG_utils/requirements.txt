@@ -1,0 +1,11 @@
+numpy
+ipykernel
+langchain_community
+langchainhub
+chromadb
+langchain
+langchain_google_genai
+pandas
+sentence-transformers
+python-dotenv
+apscheduler
