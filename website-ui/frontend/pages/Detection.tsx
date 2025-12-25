@@ -6,6 +6,8 @@ import { LanguageContext } from '../App';
 import { Card, Button } from '../components/common';
 import { generateMockAnalysis, saveToHistory } from '../utils';
 import { SAMPLE_TEXTS, CATEGORIES } from '../data';
+import { postQueryData } from '../services/db-api/data-api';
+
 
 export const Detection = () => {
   const { t, lang } = useContext(LanguageContext);
@@ -27,8 +29,17 @@ export const Detection = () => {
       setProgress(i);
       await new Promise(r => setTimeout(r, 400));
     }
+
+
     
     try {
+            // Store in database
+      await postQueryData({
+        content: text,
+        source: source || 'social media',
+        category: category
+      });
+
       const res = await generateMockAnalysis(text, { source, category });
       setProgress(100);
       saveToHistory(res);
