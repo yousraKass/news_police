@@ -28,7 +28,7 @@ def daily_job():
 
 # --- Scheduler setup ---
 scheduler = BlockingScheduler()
-scheduler.add_job(daily_job, 'cron', hour=21, minute=32)  # adjust time as needed
+scheduler.add_job(daily_job, 'cron', hour=19, minute=44)  # adjust time as needed
 
 print(f"[{datetime.now()}] Scheduler started. Will run daily at 21:29")
 scheduler.start()
