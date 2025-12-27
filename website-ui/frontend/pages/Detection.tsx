@@ -1,12 +1,13 @@
 
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, FileText } from 'lucide-react';
 import { LanguageContext } from '../App';
 import { Card, Button } from '../components/common';
 import { generateMockAnalysis, saveToHistory } from '../utils';
 import { SAMPLE_TEXTS, CATEGORIES } from '../data';
 import { postQueryData } from '../services/db-api/data-api';
+import { retrieveSimilarDocs } from '../services/ai-api/retrieve';
 
 
 export const Detection = () => {
@@ -16,12 +17,31 @@ export const Detection = () => {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [similarDocs, setSimilarDocs] = useState<any[]>([]);
+  const [isRetrieving, setIsRetrieving] = useState(false);
   const navigate = useNavigate();
+
+
+  // Retrieve similar documents
+  const handleRetrieve = async () => {
+    if (text.trim().length < 10) return;
+    setIsRetrieving(true);
+    try {
+      const result = await retrieveSimilarDocs(text, 4);
+      setSimilarDocs(result.results || []);
+    } catch (error) {
+      console.error("Retrieval failed:", error);
+    } finally {
+      setIsRetrieving(false);
+    }
+  };
+  // Check if the form is valid for submission
+  const isFormValid = text.trim().length >= 20 && category.trim().length > 0;
 
   // Fix: Await the updated asynchronous generateMockAnalysis call
   const handleAnalysis = async (e: any) => {
     e.preventDefault();
-    if (text.length < 20) return;
+    if (!isFormValid) return;
     setIsLoading(true);
     
     // Initial stage of processing
@@ -105,11 +125,71 @@ export const Detection = () => {
                 </Button>
               ))}
             </div>
-            <Button type="submit" className="w-full py-4 text-lg font-bold" disabled={text.length < 20}>
-              {t.analyzeContent} <ShieldCheck size={20} />
-            </Button>
+            <div className="flex gap-4">
+              <Button type="submit" className="flex-1 py-4 text-lg font-bold" disabled={!isFormValid}>
+                {t.analyzeContent} <ShieldCheck size={20} />
+              </Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                className="py-4 px-6 text-lg font-bold" 
+                onClick={handleRetrieve}
+                disabled={text.trim().length < 10}
+              >
+                Retrieve Similar <FileText size={20} />
+              </Button>
+            </div>
           </form>
         </Card>
+      )}
+
+      {/* Similar Documents Section */}
+      {isRetrieving && (
+        <Card className="p-8">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+              <div className="bg-green-600 h-full animate-pulse w-3/4"></div>
+            </div>
+            <p className="text-gray-500 animate-pulse">Retrieving similar documents...</p>
+          </div>
+        </Card>
+      )}
+
+      {!isRetrieving && similarDocs.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900">Similar Documents</h2>
+          <div className="grid gap-4">
+            {similarDocs.map((doc, idx) => (
+              <Card key={idx} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-blue-600">Document {idx + 1}</span>
+                    {doc.metadata?.category && (
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        {doc.metadata.category}
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-gray-800 leading-relaxed ${lang === 'ar' ? 'text-right font-arabic' : ''}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                    {doc.content}
+                  </p>
+                  {doc.metadata?.source && (
+                    <p className="text-sm text-gray-500">
+                      <span className="font-medium">Source:</span>{' '}
+                      {doc.metadata.source.includes('http') ? (
+                        <a href={doc.metadata.source} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {doc.metadata.source}
+                        </a>
+                      ) : (
+                        doc.metadata.source
+                      )}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

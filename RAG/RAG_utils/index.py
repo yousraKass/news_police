@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def index_new_documents(csv_path, persist_dir="./RAG/chroma_db", append=True):
+def index_new_documents(csv_path, persist_dir="./chroma_db", append=True):
     df = pd.read_csv(csv_path)
     docs = []
     content_col = "content"
@@ -59,12 +59,13 @@ def get_vectorstore_size(persist_dir="./chroma_db"):
     collection = vectorstore._collection
     return collection.count()
 
-#if __name__ == "__main__":
 
+# if __name__ == "__main__":
 #    script_dir = Path(__file__).parent
-#    data_path = script_dir.parent / "data" / "7days_transcripts_2025-11-01.csv"
-#    index_new_documents(str(data_path), append=True)
+#    data_path = script_dir.parent / "daily_data" / "daily_data.csv"
+#    persist_dir = script_dir.parent / "chroma_db"  
+   
+#    index_new_documents(str(data_path), persist_dir=str(persist_dir), append=True)  
 
-
-#    total_docs = get_vectorstore_size("./RAG/chroma_db")
+#    total_docs = get_vectorstore_size(str(persist_dir))  
 #    print(f"Total documents in vectorstore: {total_docs}")

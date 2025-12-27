@@ -1,11 +1,13 @@
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def diagnose_chroma_db(persist_dir="./RAG/chroma_db"):
+def diagnose_chroma_db(persist_dir="./chroma_db"):
 
     try:
         os.environ['TRANSFORMERS_CACHE'] = './RAG/models_cache'
@@ -51,4 +53,6 @@ def diagnose_chroma_db(persist_dir="./RAG/chroma_db"):
         print(f"Error diagnosing ChromaDB: {str(e)}")
 
 if __name__ == "__main__":
-    diagnose_chroma_db(persist_dir="./RAG/chroma_db")
+    script_dir = Path(__file__).parent
+    persist_dir = script_dir.parent / "chroma_db"
+    diagnose_chroma_db(persist_dir=str(persist_dir))

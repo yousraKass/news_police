@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import get_response
+from routers import get_response, retrieve
 
 app = FastAPI()
 
@@ -13,13 +13,14 @@ app.add_middleware(
 )
 
 app.include_router(get_response.router, prefix="/ai", tags=["ai"])
+app.include_router(retrieve.router, prefix="/ai", tags=["ai"])
 
 @app.get("/")
 def health_check():
     return {
         "message": "AI API is running!",
         "status": "healthy",
-        "routes": ["/ai/ask"]
+        "routes": ["/ai/ask", "/ai/retrieve"]
     }
 
 if __name__ == "__main__":

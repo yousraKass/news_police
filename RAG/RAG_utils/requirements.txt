@@ -9,3 +9,10 @@ pandas
 sentence-transformers
 python-dotenv
 apscheduler
+torch>=2.0.0
+torchvision>=0.15.0
+webdriver_manager
+bs4
+selenium
+pinecone
+langchain-pinecone
