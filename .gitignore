@@ -213,4 +213,8 @@ node_modules/
 *.ckpt
 models/
 checkpoints/
-CLASSIFIER/model/
+CLASSIFIER/model/*.safetensors
+CLASSIFIER/model/*.pt
+CLASSIFIER/model/*.ckpt
+CLASSIFIER/model/*.json
+CLASSIFIER/model/*.txt
