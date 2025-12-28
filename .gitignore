@@ -207,3 +207,14 @@ expirement/
 chroma_db/
 
 node_modules/
+
+*.safetensors
+*.pt
+*.ckpt
+models/
+checkpoints/
+CLASSIFIER/model/*.safetensors
+CLASSIFIER/model/*.pt
+CLASSIFIER/model/*.ckpt
+CLASSIFIER/model/*.json
+CLASSIFIER/model/*.txt
