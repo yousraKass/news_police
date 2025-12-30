@@ -13,12 +13,10 @@ export const Sidebar: React.FC<{ isOpen: boolean }> = ({ isOpen }) => {
     { path: '/', icon: Home, label: t.home },
     { path: '/dashboard', icon: LayoutDashboard, label: t.dashboard },
     { path: '/detect', icon: ShieldCheck, label: t.detectNews },
-    { path: '/visualize', icon: BarChart3, label: t.analytics },
-    { path: '/history', icon: History, label: t.history },
     { path: '/about', icon: Info, label: t.about },
   ];
 
-  return (
+  return (  
     <aside className={`${isOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col fixed h-full z-40 no-print`}>
       <div className="p-6 flex items-center gap-3">
         <div className="bg-blue-600 p-2 rounded-lg text-white shrink-0">

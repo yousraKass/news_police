@@ -41,7 +41,6 @@ const App = () => {
             <Route path="/detect" element={<Detection />} />
             <Route path="/results/:id" element={<Results />} />
             <Route path="/visualize" element={<Visualization />} />
-            <Route path="/history" element={<History />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </Layout>
