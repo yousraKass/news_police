@@ -1,1 +1,0 @@
-the folder shared through drive is supposed to be in this directory
