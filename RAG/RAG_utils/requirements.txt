@@ -16,3 +16,6 @@ bs4
 selenium
 pinecone
 langchain-pinecone
+pandas
+torch
+transformers
