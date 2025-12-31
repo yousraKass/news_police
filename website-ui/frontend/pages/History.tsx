@@ -1,56 +1,32 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, ArrowRight, Trash2, Search } from 'lucide-react';
 import { LanguageContext } from '../App';
 import { Card, Button, Badge } from '../components/common';
-import { getQueryData } from '../services/db-api/data-api';
-
-interface QueryDataItem {
-  id: number;
-  created_at: string;
-  content: string;
-  source: string;
-  category: string;
-  class: string | null;
-}
+import { loadHistory, deleteFromHistory } from '../utils';
+import { HistoryItem } from '../types';
 
 export const History = () => {
   const { t, lang } = useContext(LanguageContext);
-  const [items, setItems] = useState<QueryDataItem[]>([]);
+  const [items, setItems] = useState<HistoryItem[]>([]);
   const [search, setSearch] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchData();
+    setItems(loadHistory());
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const response = await getQueryData();
-      setItems(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch query data:', error);
-    } finally {
-      setIsLoading(false);
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this report?')) {
+      deleteFromHistory(id);
+      setItems(loadHistory());
     }
   };
 
   const filtered = items.filter(it => 
-    it.content.toLowerCase().includes(search.toLowerCase()) ||
-    it.source.toLowerCase().includes(search.toLowerCase()) ||
-    it.category.toLowerCase().includes(search.toLowerCase())
+    it.inputText.toLowerCase().includes(search.toLowerCase()) ||
+    it.metadata.source.toLowerCase().includes(search.toLowerCase())
   );
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   return (
     <div className="space-y-8 fade-in">
@@ -76,46 +52,33 @@ export const History = () => {
               <thead className="bg-gray-50 border-b">
                  <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Date</th>
-                    <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Source</th>
-                    <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Category</th>
-                    <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Content</th>
                     <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Result</th>
+                    <th className={`px-6 py-4 ${lang === 'ar' ? 'text-right' : ''}`}>Content</th>
+                    <th className={`px-6 py-4 ${lang === 'ar' ? 'text-left' : 'text-right'}`}>Actions</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                 {isLoading ? (
-                   <tr>
-                     <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
-                       Loading...
-                     </td>
-                   </tr>
-                 ) : filtered.map((it) => (
+                 {filtered.map((it) => (
                    <tr key={it.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{formatDate(it.created_at)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{it.source}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">{it.category}</span>
-                      </td>
-                      <td className={`px-6 py-4 font-arabic text-sm truncate max-w-xs ${lang === 'ar' ? 'text-right' : ''}`} dir="rtl">{it.content}</td>
-                      <td className="px-6 py-4 text-sm">
-                        {it.class ? (
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            it.class.toLowerCase().includes('fake') || it.class.toLowerCase().includes('false') 
-                              ? 'bg-red-100 text-red-700' 
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {it.class}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">Not yet analyzed</span>
-                        )}
+                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{it.date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><Badge status={it.status} /></td>
+                      <td className={`px-6 py-4 font-arabic text-sm truncate max-w-xs ${lang === 'ar' ? 'text-right' : ''}`} dir="rtl">{it.inputText}</td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${lang === 'ar' ? 'text-left' : 'text-right'}`}>
+                        <div className="flex justify-end gap-2">
+                           <Button variant="ghost" className="p-2" onClick={() => navigate(`/results/${it.id}`, { state: { result: it } })}>
+                             <ArrowRight size={16} className={lang === 'ar' ? 'rotate-180' : ''} />
+                           </Button>
+                           <Button variant="ghost" className="p-2 text-red-500 hover:text-red-600" onClick={() => handleDelete(it.id)}>
+                             <Trash2 size={16} />
+                           </Button>
+                        </div>
                       </td>
                    </tr>
                  ))}
               </tbody>
             </table>
           </div>
-          {!isLoading && filtered.length === 0 && (
+          {filtered.length === 0 && (
             <div className="p-12 text-center text-gray-400 italic">
               {search ? 'No results found for your search.' : 'No records found. Start your first analysis!'}
             </div>
