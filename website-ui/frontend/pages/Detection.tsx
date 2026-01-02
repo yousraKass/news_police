@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Upload, X, AlertCircle } from 'lucide-react';
 import { LanguageContext } from '../App';
 import { Card, Button } from '../components/common';
-import { generateMockAnalysis, saveToHistory } from '../utils';
+import { saveToHistory } from '../utils';
 import { SAMPLE_TEXTS } from '../data';
+import { analyzeText } from '../services/analyze';
 
 // Real categories from the dataset
 const REAL_CATEGORIES = [
@@ -139,17 +140,52 @@ export const Detection = () => {
         });
       }, 200);
       
-      // Generate analysis
-      const res = await generateMockAnalysis(text, { 
-        category: finalCategory,
-        source: uploadedFile?.name || 'Direct Input'
-      });
+      // Call real API for analysis
+      const apiResult = await analyzeText(text, { k: 4, threshold: 0.35 });
       
       clearInterval(progressInterval);
       setProgress(100);
       
+      // Transform API response to match Results page format
+      const labelMap: Record<string, string> = {
+        'Not_fake': 'Real',
+        'fake': 'Fake',
+        'satire': 'Satire',
+        'not_news': 'Not News'
+      };
+      
+      const transformedResult = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        status: labelMap[apiResult.verdict.label] || 'Unknown',
+        confidence: Math.round(apiResult.verdict.confidence * 100),
+        inputText: text,
+        probabilities: {
+          fake: apiResult.partition.fake || 0,
+          real: apiResult.partition.Not_fake || 0,
+          satire: apiResult.partition.satire || 0,
+          not_news: apiResult.partition.not_news || 0
+        },
+        indicators: apiResult.detection_reasoning.map((reason: any) => ({
+          title: reason.title,
+          description: reason.description
+        })),
+        metadata: {
+          source: uploadedFile?.name || 'Direct Input',
+          category: finalCategory,
+          mode: 'real',
+          documents: apiResult.documents || []
+        },
+        linguisticPatterns: {
+          emotionLevel: apiResult.linguistic_profile.emotional_level || 'Unknown',
+          sourceCitations: (apiResult.documents || []).length,
+          factualClaims: apiResult.linguistic_profile.factual_claims || 0,
+          dialect: apiResult.linguistic_profile.dialect || 'Unknown'
+        }
+      };
+      
       // Save to history
-      saveToHistory(res);
+      saveToHistory(transformedResult);
       
       // Small delay to show 100% completion
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -157,7 +193,7 @@ export const Detection = () => {
       setIsLoading(false);
       
       // Navigate to results
-      navigate(`/results/${res.id}`, { state: { result: res } });
+      navigate(`/results/${transformedResult.id}`, { state: { result: transformedResult } });
       
     } catch (error) {
       console.error("Analysis failed:", error);
