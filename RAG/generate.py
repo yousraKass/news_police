@@ -8,6 +8,8 @@ This module provides RAG (Retrieval-Augmented Generation) functionality that:
 """
 
 import os
+import json
+import re
 from pathlib import Path
 from typing import Dict, List
 from dotenv import load_dotenv
@@ -52,28 +54,67 @@ class RAGGenerator:
             google_api_key=api_key
         )
         
-        # Create prompt template
-        self.template = """You are an assistant for question-answering tasks specialized in analyzing news content.
+        # Create prompt template for structured analysis
+        self.template = """You are a specialized news content analyzer with expertise in detecting fake news, satire, and authentic journalism.
 
-CLASSIFICATION RESULT:
-The query has been classified as: {classification_label} ({classification_description})
-Confidence: {classification_confidence}
-Classification Context: This is based on a linguistic processing task that analyzed the query for potential fake news indicators.
+IMPORTANT: A preliminary classifier has analyzed this content, but it often makes mistakes. DO NOT rely heavily on its results. Use your own judgment based on the content and retrieved context.
+
+PRELIMINARY CLASSIFIER RESULT (use with caution):
+- Label: {classification_label}
+- Confidence: {classification_confidence}
 
 RETRIEVED CONTEXT:
 {context}
 
-Your task is to:
-1. Consider the classification result when formulating your answer
-2. Use the retrieved context to provide accurate information
-3. If the classification indicates "fake" or "satire", mention this in your response
-4. If you don't know the answer or there's insufficient context, say so
-5. Keep the answer concise and informative
-6. Answer in Arabic if the question is in Arabic
+QUERY TO ANALYZE:
+{question}
 
-Question: {question}
+Your task is to conduct YOUR OWN INDEPENDENT ANALYSIS and generate a STRUCTURED JSON response with the following fields. Respond in Arabic if the query is in Arabic, otherwise respond in French:
 
-Answer:"""
+1. "partition": YOUR OWN probability assessment as an object:
+   - "Not_fake": Your assessed probability this is real/legitimate news (0.0 to 1.0)
+   - "fake": Your assessed probability this is fake news (0.0 to 1.0)
+   - "satire": Your assessed probability this is satire/parody (0.0 to 1.0)
+   - "not_news": Your assessed probability this is not news content (0.0 to 1.0)
+   
+   CRITICAL: These four probabilities MUST sum to EXACTLY 1.0 (100%). Double-check your math before responding.
+   Example: If Not_fake=0.15, fake=0.25, satire=0.55, not_news=0.05, then 0.15+0.25+0.55+0.05 = 1.0 ✓
+
+2. "detection_reasoning": A list of 2-4 reasons explaining YOUR classification decision. Each reason should have:
+   - "title": Short title for the detection indicator
+   - "description": Brief explanation of this indicator
+
+3. "linguistic_profile": An object containing:
+   - "dialect": The detected dialect/language (e.g., "Algerian Darja", "Standard Arabic", "French")
+   - "emotional_level": The emotional intensity ("Low", "Medium", "High" or in target language)
+   - "cited_sources": Number of sources cited (integer, estimate from content)
+   - "factual_claims": Number of factual claims made (integer, estimate from content)
+   - "language": The language code ("ar" for Arabic, "fr" for French, etc.)
+
+IMPORTANT: The partition probabilities MUST sum to exactly 1.0. Make your own independent assessment.
+
+Return ONLY a valid JSON object with these exact keys: "partition", "detection_reasoning", "linguistic_profile"
+
+Example structure:
+{{
+  "partition": {{
+    "Not_fake": 0.15,
+    "fake": 0.25,
+    "satire": 0.55,
+    "not_news": 0.05
+  }},
+  "detection_reasoning": [
+    {{"title": "Reason 1 title", "description": "Explanation..."}},
+    {{"title": "Reason 2 title", "description": "Explanation..."}}
+  ],
+  "linguistic_profile": {{
+    "dialect": "Algerian Darja",
+    "emotional_level": "Low",
+    "cited_sources": 0,
+    "factual_claims": 1,
+    "language": "ar"
+  }}
+}}"""
 
         self.prompt = ChatPromptTemplate.from_template(self.template)
         
@@ -107,6 +148,47 @@ Answer:"""
         
         return "\n\n".join(formatted)
     
+    def parse_llm_response(self, llm_output: str) -> Dict:
+        """
+        Parse the LLM JSON response, handling markdown code blocks
+        
+        Args:
+            llm_output: Raw output from LLM
+            
+        Returns:
+            Parsed dictionary
+        """
+        try:
+            # Try to extract JSON from markdown code blocks
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', llm_output, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Try to find raw JSON
+                json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    json_str = llm_output
+            
+            parsed = json.loads(json_str)
+            return parsed
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error: {e}")
+            print(f"LLM Output: {llm_output}")
+            # Return a default structure
+            return {
+                "answer": llm_output,
+                "detection_reasoning": [],
+                "linguistic_profile": {
+                    "dialect": "Unknown",
+                    "emotional_level": "Unknown",
+                    "cited_sources": 0,
+                    "factual_claims": 0,
+                    "language": "unknown"
+                }
+            }
+    
     def generate(
         self,
         query: str,
@@ -114,7 +196,7 @@ Answer:"""
         threshold: float = 0.35
     ) -> Dict:
         """
-        Generate an answer using RAG with classification context
+        Generate a comprehensive analysis using RAG with classification context
         
         Args:
             query: The user's question
@@ -122,7 +204,7 @@ Answer:"""
             threshold: Similarity threshold for retrieval
             
         Returns:
-            Dictionary containing the answer and metadata
+            Dictionary containing the structured analysis report
         """
         # Get classification and retrieval results
         decision_result = self.decision_engine.analyze(
@@ -142,7 +224,6 @@ Answer:"""
         # Prepare prompt inputs
         prompt_inputs = {
             "classification_label": classification['predicted_label'],
-            "classification_description": classification['description'],
             "classification_confidence": f"{classification['confidence']:.2%}",
             "context": formatted_context,
             "question": query
@@ -155,29 +236,75 @@ Answer:"""
             | self.output_parser
         )
         
-        answer = rag_chain.invoke(prompt_inputs)
+        llm_output = rag_chain.invoke(prompt_inputs)
         
-        # Return comprehensive result
-        return {
-            "query": query,
-            "answer": answer,
-            "classification": classification,
+        # Parse the structured response
+        structured_analysis = self.parse_llm_response(llm_output)
+        
+        # Get LLM's partition or use default
+        llm_partition = structured_analysis.get('partition', {
+            'Not_fake': 0.25,
+            'fake': 0.25,
+            'satire': 0.25,
+            'not_news': 0.25
+        })
+        
+        # Normalize partition to ensure it sums to 1.0
+        partition_sum = sum(llm_partition.values())
+        if abs(partition_sum - 1.0) > 0.01:  # If not close to 1.0, normalize
+            llm_partition = {
+                key: value / partition_sum 
+                for key, value in llm_partition.items()
+            }
+        
+        # Determine verdict based on LLM's partition
+        llm_verdict_label = max(llm_partition.items(), key=lambda x: x[1])[0]
+        llm_verdict_confidence = llm_partition[llm_verdict_label]
+        
+        label_descriptions = {
+            'Not_fake': 'Real/Legitimate News',
+            'fake': 'Fake News',
+            'satire': 'Satirical Content',
+            'not_news': 'Not News Content'
+        }
+        
+        # Build comprehensive result
+        result = {
+            "original_content": query,
+            "verdict": {
+                "label": llm_verdict_label,
+                "description": label_descriptions.get(llm_verdict_label, 'Unknown'),
+                "confidence": llm_verdict_confidence
+            },
+            "partition": llm_partition,
+            "classifier_reference": {
+                "label": classification['predicted_label'],
+                "confidence": classification['confidence'],
+                "partition": {
+                    label: prob 
+                    for label, prob in classification.get('all_probabilities', {}).items()
+                }
+            },
+            "detection_reasoning": structured_analysis.get('detection_reasoning', []),
+            "linguistic_profile": structured_analysis.get('linguistic_profile', {}),
             "documents_retrieved": len(documents),
             "documents": documents
         }
+        
+        return result
     
-    def generate_simple(self, query: str) -> str:
+    def generate_simple(self, query: str) -> Dict:
         """
-        Simple interface that just returns the answer string
+        Simple interface that returns the full analysis result
         
         Args:
             query: The user's question
             
         Returns:
-            Generated answer as string
+            Analysis result dictionary
         """
         result = self.generate(query)
-        return result['answer']
+        return result
 
 
 # Singleton instance
@@ -212,8 +339,27 @@ if __name__ == "__main__":
         
         result = generator.generate(query, k=3, threshold=0.35)
         
-        print(f"Classification: {result['classification']['predicted_label']} "
-              f"({result['classification']['confidence']:.2%})")
-        print(f"Documents Retrieved: {result['documents_retrieved']}")
-        print(f"\nAnswer:\n{result['answer']}")
+        print(f"\n--- VERDICT ---")
+        print(f"Label: {result['verdict']['label']}")
+        print(f"Confidence: {result['verdict']['confidence']:.2%}")
+        
+        print(f"\n--- PARTITION ---")
+        for label, prob in result['partition'].items():
+            print(f"{label}: {prob:.2%}")
+        
+        print(f"\n--- DETECTION REASONING ---")
+        for i, reason in enumerate(result['detection_reasoning'], 1):
+            print(f"{i}. {reason.get('title', 'N/A')}")
+            print(f"   {reason.get('description', 'N/A')}")
+        
+        print(f"\n--- LINGUISTIC PROFILE ---")
+        profile = result['linguistic_profile']
+        print(f"Dialect: {profile.get('dialect', 'N/A')}")
+        print(f"Emotional Level: {profile.get('emotional_level', 'N/A')}")
+        print(f"Cited Sources: {profile.get('cited_sources', 0)}")
+        print(f"Factual Claims: {profile.get('factual_claims', 0)}")
+        
+        print(f"\n--- DOCUMENTS ---")
+        print(f"Retrieved: {result['documents_retrieved']}")
+        
         print(f"\n{'='*80}")

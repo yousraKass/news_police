@@ -170,7 +170,8 @@ export const Results = () => {
                         data={[
                           {name: t.fake, v: result.probabilities.fake * 100},
                           {name: t.real, v: result.probabilities.real * 100},
-                          {name: t.satire, v: result.probabilities.satire * 100}
+                          {name: t.satire, v: result.probabilities.satire * 100},
+                          {name: lang === 'ar' ? 'ليس خبر' : 'Not News', v: (result.probabilities.not_news || 0) * 100}
                         ]} 
                         innerRadius={60} 
                         outerRadius={80} 
@@ -180,6 +181,7 @@ export const Results = () => {
                         <Cell fill="#ef4444" />
                         <Cell fill="#22c55e" />
                         <Cell fill="#f97316" />
+                        <Cell fill="#9333ea" />
                       </Pie>
                       <Tooltip />
                    </PieChart>
@@ -197,6 +199,16 @@ export const Results = () => {
                 <div className="flex justify-between text-gray-700">
                   <span>{t.satire}</span>
                   <span className="font-bold">{(result.probabilities.satire * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-gray-700">
+                  <span>{lang === 'ar' ? 'ليس خبر' : 'Not News'}</span>
+                  <span className="font-bold">{((result.probabilities.not_news || 0) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-gray-700 pt-2 mt-2 border-t border-gray-200">
+                  <span className="font-semibold">{lang === 'ar' ? 'المجموع' : 'Total'}</span>
+                  <span className="font-bold text-blue-600">
+                    {((result.probabilities.fake + result.probabilities.real + result.probabilities.satire + (result.probabilities.not_news || 0)) * 100).toFixed(1)}%
+                  </span>
                 </div>
              </div>
           </Card>
@@ -231,7 +243,7 @@ export const Results = () => {
                    {lang === 'ar' ? 'المصادر المذكورة' : 'Cited Sources'}
                  </span>
                  <span className="font-bold text-gray-900">
-                   {result.linguisticPatterns.sourceCitations}
+                   {result.metadata?.documents?.length || result.linguisticPatterns.sourceCitations || 0}
                  </span>
                </div>
                <div className="flex justify-between items-center text-sm">
@@ -246,6 +258,41 @@ export const Results = () => {
           </Card>
         </div>
       </div>
+
+      {/* Retrieved Documents Section */}
+      {result.metadata?.documents && result.metadata.documents.length > 0 && (
+        <Card title={lang === 'ar' ? 'المستندات المسترجعة' : 'Retrieved Documents'}>
+          <div className="space-y-4">
+            {result.metadata.documents.map((doc: any, idx: number) => (
+              <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-gray-700 mb-2">
+                      {lang === 'ar' ? 'مستند' : 'Document'} {idx + 1}
+                    </div>
+                    <p className={`text-sm text-gray-600 line-clamp-3 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {doc.content?.substring(0, 200)}...
+                    </p>
+                  </div>
+                  {doc.metadata?.source && (
+                    <a
+                      href={doc.metadata.source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      {lang === 'ar' ? 'المصدر' : 'Source'}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Action Buttons */}
       <div className="flex justify-center gap-4 no-print">
