@@ -1,89 +1,136 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { FileText, AlertTriangle, Activity, Users, TrendingUp, Download, Database, Layers, Target, Award } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
 import { LanguageContext } from '../App';
 import { Card, Button } from '../components/common';
+import { dashboardService } from '../services/dashboardService';
 
 export const Dashboard = () => {
   const { t, lang } = useContext(LanguageContext);
   
-  // Real model performance metrics from your DziriBERT classifier
+  // State for dashboard data
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [platformStats, setPlatformStats] = useState<any>(null);
+  const [classPerformance, setClassPerformance] = useState<any[]>([]);
+  const [weeklyTrends, setWeeklyTrends] = useState<any[]>([]);
+  const [datasetDistribution, setDatasetDistribution] = useState<any[]>([]);
+
+  // Fetch dashboard data on component mount
+  useEffect(() => {
+    async function fetchDashboardData() {
+      try {
+        setLoading(true);
+        const data = await dashboardService.getAllDashboardData();
+        
+        setPlatformStats(data.platformStats);
+        setClassPerformance(data.classPerformance);
+        setWeeklyTrends(data.weeklyTrends);
+        setDatasetDistribution(data.datasetDistribution);
+      } catch (err: any) {
+        console.error('Error fetching dashboard data:', err);
+        setError(err.message || 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">{lang === 'ar' ? 'جاري التحميل...' : 'Loading...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto mb-4 text-red-500" size={48} />
+          <p className="text-red-600 mb-2">{lang === 'ar' ? 'خطأ في تحميل البيانات' : 'Error loading data'}</p>
+          <p className="text-gray-500 text-sm">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Real model performance metrics
   const modelMetrics = {
-    overallAccuracy: 86.59, // Overall accuracy from classification report
-    weightedPrecision: 87.48, // Weighted avg precision
-    weightedRecall: 86.59, // Same as accuracy (weighted avg recall)
-    weightedF1Score: 86.91, // Weighted avg F1-score
-    totalParameters: 124, // 124M parameters (DziriBERT)
-    trainableParameters: 7, // ~7M trainable params (final layers)
+    overallAccuracy: platformStats?.accuracy_rate || 86.59,
+    weightedPrecision: 87.48,
+    weightedRecall: 86.59,
+    weightedF1Score: 86.91,
+    totalParameters: 124,
+    trainableParameters: 7,
   };
 
   // Real dataset statistics
   const datasetStats = {
-    totalSamples: 7329,
-    trainSamples: 5964, // ~80% of 7329 (after processing: 5964 total)
-    testSamples: 1193, // Test set size from your results
+    totalSamples: platformStats?.total_samples || 7329,
+    trainSamples: 5964,
+    testSamples: 1193,
     vocabularySize: 54430,
     avgWordCount: 36.65,
     sources: 9,
     categories: 9,
   };
 
-  // Class distribution after processing (from your data)
-  const classDistribution = [
-    { name: lang === 'ar' ? 'أخبار حقيقية' : 'Real News', value: 4353, percentage: 73.0, color: '#22c55e' },
-    { name: lang === 'ar' ? 'أخبار مزيفة' : 'Fake News', value: 800, percentage: 13.4, color: '#ef4444' },
-    { name: lang === 'ar' ? 'ساخر' : 'Satire', value: 134, percentage: 2.2, color: '#f97316' },
-    { name: lang === 'ar' ? 'ليس أخبار' : 'Not News', value: 677, percentage: 11.4, color: '#8b5cf6' },
-  ];
+  // Format class distribution for pie chart
+  const classDistributionChart = datasetDistribution.map((item) => ({
+    name: lang === 'ar' 
+      ? item.category === 'Real News' ? 'أخبار حقيقية'
+      : item.category === 'Fake News' ? 'أخبار مزيفة'
+      : item.category === 'Satire' ? 'ساخر'
+      : 'ليس أخبار'
+      : item.category,
+    value: item.count,
+    percentage: item.percentage,
+    color: item.category === 'Real News' ? '#22c55e'
+      : item.category === 'Fake News' ? '#ef4444'
+      : item.category === 'Satire' ? '#f97316'
+      : '#8b5cf6'
+  }));
 
-  // Per-class performance from classification report
-  const classPerformance = [
-    { 
-      class: lang === 'ar' ? 'حقيقية' : 'Real', 
-      precision: 95.44, 
-      recall: 91.27, 
-      f1: 93.31, 
-      support: 871,
-      color: '#22c55e'
-    },
-    { 
-      class: lang === 'ar' ? 'مزيفة' : 'Fake', 
-      precision: 67.58, 
-      recall: 76.88, 
-      f1: 71.93, 
-      support: 160,
-      color: '#ef4444'
-    },
-    { 
-      class: lang === 'ar' ? 'ساخر' : 'Satire', 
-      precision: 59.09, 
-      recall: 48.15, 
-      f1: 53.06, 
-      support: 27,
-      color: '#f97316'
-    },
-    { 
-      class: lang === 'ar' ? 'ليس أخبار' : 'Not News', 
-      precision: 65.38, 
-      recall: 75.56, 
-      f1: 70.10, 
-      support: 135,
-      color: '#8b5cf6'
-    },
-  ];
+  // Format class performance data
+  const classPerformanceData = classPerformance.map((cls) => ({
+    class: lang === 'ar' 
+      ? cls.class_name === 'Real' ? 'حقيقية'
+      : cls.class_name === 'Fake' ? 'مزيفة'
+      : cls.class_name === 'Satire' ? 'ساخر'
+      : 'ليس أخبار'
+      : cls.class_name,
+    precision: cls.precision_score || cls.accuracy || 0,
+    recall: cls.recall_score || cls.accuracy || 0,
+    f1: cls.f1_score || cls.accuracy || 0,
+    support: cls.samples,
+    color: cls.class_name === 'Real' ? '#22c55e'
+      : cls.class_name === 'Fake' ? '#ef4444'
+      : cls.class_name === 'Satire' ? '#f97316'
+      : '#8b5cf6'
+  }));
 
-  // Detection trends over time (mock weekly data but realistic proportions)
-  const detectionTrends = [
-    { week: 'W1', fake: 12, real: 52, satire: 2, notNews: 8 },
-    { week: 'W2', fake: 15, real: 58, satire: 3, notNews: 10 },
-    { week: 'W3', fake: 10, real: 55, satire: 1, notNews: 9 },
-    { week: 'W4', fake: 18, real: 60, satire: 4, notNews: 11 },
-    { week: 'W5', fake: 14, real: 54, satire: 2, notNews: 8 },
-    { week: 'W6', fake: 20, real: 62, satire: 3, notNews: 12 },
-    { week: 'W7', fake: 16, real: 57, satire: 2, notNews: 10 },
-  ];
+  // Format weekly trends for area chart
+  const detectionTrends = weeklyTrends.map((week, idx) => ({
+    week: `W${idx + 1}`,
+    fake: week.fake_count,
+    real: week.real_count,
+    satire: week.satire_count,
+    notNews: week.not_news_count
+  }));
 
   // Main dashboard statistics cards
   const stats = [
@@ -109,11 +156,11 @@ export const Dashboard = () => {
       subtitle: `${modelMetrics.trainableParameters}M ${lang === 'ar' ? 'قابلة للتدريب' : 'trainable'}`
     },
     { 
-      label: lang === 'ar' ? 'حجم المفردات' : 'Vocabulary Size', 
-      value: datasetStats.vocabularySize.toLocaleString(), 
-      icon: FileText, 
+      label: lang === 'ar' ? 'طلبات API' : 'API Calls', 
+      value: (platformStats?.api_calls || 0).toLocaleString(), 
+      icon: Activity, 
       color: 'orange',
-      subtitle: `${datasetStats.avgWordCount} ${lang === 'ar' ? 'كلمة/نص' : 'words/text avg'}`
+      subtitle: `${(platformStats?.total_users || 0).toLocaleString()} ${lang === 'ar' ? 'مستخدم' : 'users'}`
     },
   ];
 
@@ -160,7 +207,7 @@ export const Dashboard = () => {
             {lang === 'ar' ? 'أداء كل فئة' : 'Per-Class Performance'}
           </h3>
           <div className="space-y-4">
-            {classPerformance.map((cls, idx) => (
+            {classPerformanceData.map((cls, idx) => (
               <div key={idx} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-700">{cls.class}</span>
@@ -171,15 +218,15 @@ export const Dashboard = () => {
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
                     <div className="text-xs text-gray-500">{lang === 'ar' ? 'دقة' : 'Precision'}</div>
-                    <div className="font-bold" style={{ color: cls.color }}>{cls.precision}%</div>
+                    <div className="font-bold" style={{ color: cls.color }}>{cls.precision.toFixed(2)}%</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">{lang === 'ar' ? 'استدعاء' : 'Recall'}</div>
-                    <div className="font-bold" style={{ color: cls.color }}>{cls.recall}%</div>
+                    <div className="font-bold" style={{ color: cls.color }}>{cls.recall.toFixed(2)}%</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">F1</div>
-                    <div className="font-bold" style={{ color: cls.color }}>{cls.f1}%</div>
+                    <div className="font-bold" style={{ color: cls.color }}>{cls.f1.toFixed(2)}%</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
@@ -201,7 +248,7 @@ export const Dashboard = () => {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={classDistribution}
+                data={classDistributionChart}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -210,7 +257,7 @@ export const Dashboard = () => {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {classDistribution.map((entry, index) => (
+                {classDistributionChart.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -219,7 +266,7 @@ export const Dashboard = () => {
             </PieChart>
           </ResponsiveContainer>
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            {classDistribution.map((cls, idx) => (
+            {classDistributionChart.map((cls, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: cls.color }} />
                 <span className="text-gray-600">{cls.value.toLocaleString()} samples</span>
@@ -230,52 +277,54 @@ export const Dashboard = () => {
       </div>
 
       {/* Detection Trends Chart */}
-      <Card>
-        <h3 className="text-lg font-bold text-gray-900 mb-4">
-          {lang === 'ar' ? 'اتجاهات الكشف الأسبوعية' : 'Weekly Detection Trends'}
-        </h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <AreaChart data={detectionTrends}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="week" axisLine={false} tickLine={false} />
-            <YAxis axisLine={false} tickLine={false} />
-            <Tooltip />
-            <Legend />
-            <Area 
-              type="monotone" 
-              dataKey="fake" 
-              name={lang === 'ar' ? 'مزيف' : 'Fake'} 
-              stackId="1"
-              stroke="#ef4444" 
-              fill="#fee2e2" 
-            />
-            <Area 
-              type="monotone" 
-              dataKey="real" 
-              name={lang === 'ar' ? 'حقيقي' : 'Real'} 
-              stackId="1"
-              stroke="#22c55e" 
-              fill="#dcfce7" 
-            />
-            <Area 
-              type="monotone" 
-              dataKey="satire" 
-              name={lang === 'ar' ? 'ساخر' : 'Satire'} 
-              stackId="1"
-              stroke="#f97316" 
-              fill="#ffedd5" 
-            />
-            <Area 
-              type="monotone" 
-              dataKey="notNews" 
-              name={lang === 'ar' ? 'ليس أخبار' : 'Not News'} 
-              stackId="1"
-              stroke="#8b5cf6" 
-              fill="#ede9fe" 
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Card>
+      {detectionTrends.length > 0 && (
+        <Card>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">
+            {lang === 'ar' ? 'اتجاهات الكشف الأسبوعية' : 'Weekly Detection Trends'}
+          </h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <AreaChart data={detectionTrends}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="week" axisLine={false} tickLine={false} />
+              <YAxis axisLine={false} tickLine={false} />
+              <Tooltip />
+              <Legend />
+              <Area 
+                type="monotone" 
+                dataKey="fake" 
+                name={lang === 'ar' ? 'مزيف' : 'Fake'} 
+                stackId="1"
+                stroke="#ef4444" 
+                fill="#fee2e2" 
+              />
+              <Area 
+                type="monotone" 
+                dataKey="real" 
+                name={lang === 'ar' ? 'حقيقي' : 'Real'} 
+                stackId="1"
+                stroke="#22c55e" 
+                fill="#dcfce7" 
+              />
+              <Area 
+                type="monotone" 
+                dataKey="satire" 
+                name={lang === 'ar' ? 'ساخر' : 'Satire'} 
+                stackId="1"
+                stroke="#f97316" 
+                fill="#ffedd5" 
+              />
+              <Area 
+                type="monotone" 
+                dataKey="notNews" 
+                name={lang === 'ar' ? 'ليس أخبار' : 'Not News'} 
+                stackId="1"
+                stroke="#8b5cf6" 
+                fill="#ede9fe" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
 
       {/* Model Architecture Info */}
       <Card>
